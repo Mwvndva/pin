@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Pin",
+    "slug": "pin",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/kompas-logo.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/kompas-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#050505"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.pin.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Pin uses the camera so you can add memories to social pins.",
+        "NSLocationWhenInUseUsageDescription": "Pin uses your location to show nearby social pins and route you to events.",
+        "NSPhotoLibraryUsageDescription": "Pin uses photo access so you can share memories from events."
+      }
+    },
+    "android": {
+      "package": "com.pin.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/kompas-logo.png",
+        "backgroundColor": "#050505"
+      },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "extra": {
+      "usesPaidThirdPartyServices": false
+    }
+  }
+}

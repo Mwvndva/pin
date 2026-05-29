@@ -1,0 +1,8 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">KOMPAS monochrome smile pin</title>
+  <desc id="desc">A black and white smile map pin.</desc>
+  <path d="M128 22C82 22 45 59 45 105C45 160 128 236 128 236C128 236 211 160 211 105C211 59 174 22 128 22Z" fill="#FFFFFF" stroke="#000000" stroke-width="8" stroke-linejoin="round"/>
+  <ellipse cx="100" cy="98" rx="10" ry="16" fill="#000000"/>
+  <ellipse cx="156" cy="98" rx="10" ry="16" fill="#000000"/>
+  <path d="M91 139C106 164 149 164 165 139" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
+</svg>
