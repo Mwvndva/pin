@@ -13,7 +13,7 @@
 
 - Auth: sign up, login, logout, account deletion
 - Pins: one active pin per user, 24-hour expiry, categories, unsafe signal, reports
-- Memories: camera capture, upload, Feed, Following, one reaction per memory
+- Memories: camera capture, upload, Feed, Friends, one reaction per memory
 - Social: follow/unfollow, mutual-only DMs, notifications
 - Streaks: mutual reaction increments streak, streak expires after 5 inactive days
 - Safety: report pin/memory/user, block user, moderation queue

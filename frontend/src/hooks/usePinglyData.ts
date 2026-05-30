@@ -6,6 +6,7 @@ import {
   followUser,
   getBootstrap,
   pullUp,
+  reactToPin,
   reactToMemory,
   reportTarget,
   sendDm,
@@ -21,6 +22,7 @@ type CreatePinInput = {
   startsAt?: string;
   latitude?: number;
   longitude?: number;
+  audience?: "friends" | "public";
 };
 
 export function usePinglyData() {
@@ -79,6 +81,28 @@ export function usePinglyData() {
     return result;
   }, []);
 
+  const sendPinReaction = useCallback(async (pinId: string, emoji: string) => {
+    const result = await reactToPin(pinId, emoji);
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            pins: current.pins.map((pin) =>
+              pin.id === pinId
+                ? {
+                    ...pin,
+                    reactions: result.reactions,
+                    reactionCounts: result.reactionCounts,
+                    userReaction: result.userReaction
+                  }
+                : pin
+            )
+          }
+        : current
+    );
+    return result;
+  }, []);
+
   const addMemory = useCallback(async (pinId: string) => {
     const memory = await uploadMemory({ pinId });
     setData((current) =>
@@ -111,13 +135,19 @@ export function usePinglyData() {
 
   const follow = useCallback(async (memory: Memory) => {
     if (!memory.ownerId) return;
-    await followUser(memory.ownerId);
+    const result = await followUser(memory.ownerId);
     setData((current) =>
       current
         ? {
             ...current,
             memories: current.memories.map((item) =>
-              item.ownerId === memory.ownerId ? { ...item, followed: true } : item
+              item.ownerId === memory.ownerId
+                ? {
+                    ...item,
+                    followed: Boolean(result.mutual),
+                    friendStatus: result.mutual ? "friends" : "pending"
+                  }
+                : item
             )
           }
         : current
@@ -131,7 +161,7 @@ export function usePinglyData() {
         ? {
             ...current,
             memories: current.memories.map((item) =>
-              item.ownerId === userId ? { ...item, followed: false } : item
+              item.ownerId === userId ? { ...item, followed: false, friendStatus: "none" } : item
             )
           }
         : current
@@ -177,6 +207,7 @@ export function usePinglyData() {
     addPin,
     removePin,
     markPullingUp,
+    sendPinReaction,
     addMemory,
     sendReaction,
     follow,

@@ -31,7 +31,7 @@ export function MemoriesScreen({
   onSendMessage
 }: MemoriesScreenProps) {
   const [mode, setMode] = useState<"camera" | "browser">("camera");
-  const [audience, setAudience] = useState<"feed" | "following">("feed");
+  const [audience, setAudience] = useState<"feed" | "friends">("feed");
   const [memoryIndex, setMemoryIndex] = useState(0);
   const [reactionIndex, setReactionIndex] = useState(0);
   const [reactedMemoryIds, setReactedMemoryIds] = useState<string[]>([]);
@@ -46,8 +46,8 @@ export function MemoriesScreen({
   const visibleMemories = useMemo(
     () =>
       memories.filter((memory) =>
-        audience === "following"
-          ? memory.audience === "following" || memory.followed
+        audience === "friends"
+          ? memory.audience === "friends" || memory.audience === "following" || memory.followed
           : memory.audience === "feed" && !memory.followed
       ),
     [audience, memories]
@@ -76,6 +76,8 @@ export function MemoriesScreen({
         reacted: false
       };
   const hasVisibleMemory = currentMemory.id !== "empty-memory";
+  const currentFriendStatus = currentMemory.friendStatus ?? (currentMemory.followed ? "friends" : "none");
+  const canMessageCurrentMemory = currentFriendStatus === "friends";
 
   const memorySwipeResponder = useMemo(
     () =>
@@ -174,7 +176,7 @@ export function MemoriesScreen({
       ) : (
         <View style={styles.browser}>
           <View style={[styles.tabs, { backgroundColor: theme.panel }]}>
-            {(["feed", "following"] as const).map((item) => {
+            {(["feed", "friends"] as const).map((item) => {
               const active = audience === item;
               return (
                 <Pressable
@@ -192,7 +194,7 @@ export function MemoriesScreen({
                       { color: active ? colors.black : theme.muted }
                     ]}
                   >
-                    {item === "feed" ? "Feed" : "Following"}
+                    {item === "feed" ? "Public" : "Friends"}
                   </Text>
                 </Pressable>
               );
@@ -203,7 +205,7 @@ export function MemoriesScreen({
             style={[styles.memoryFrame, { backgroundColor: theme.panel }]}
             {...memorySwipeResponder.panHandlers}
           >
-            {hasVisibleMemory && audience === "feed" && !currentMemory.followed && (
+            {hasVisibleMemory && audience === "feed" && currentFriendStatus === "none" && (
               <Pressable
                 onPress={async () => {
                   await onFollow(currentMemory);
@@ -211,10 +213,15 @@ export function MemoriesScreen({
                 }}
                 style={styles.followButton}
               >
-                <Text style={styles.followText}>Follow</Text>
+                <Text style={styles.followText}>Add friend</Text>
               </Pressable>
             )}
-            {hasVisibleMemory && currentMemory.followed && (
+            {hasVisibleMemory && audience === "feed" && currentFriendStatus === "pending" && (
+              <View style={[styles.followButton, styles.requestedButton]}>
+                <Text style={styles.followText}>Requested</Text>
+              </View>
+            )}
+            {hasVisibleMemory && canMessageCurrentMemory && (
               <Pressable
                 accessibilityLabel={`Message ${currentMemory.owner}`}
                 onPress={() => {
@@ -241,12 +248,12 @@ export function MemoriesScreen({
             ) : (
               <View style={styles.emptyMemoryState}>
                 <Text style={[styles.emptyMemoryTitle, { color: theme.text }]}>
-                  {audience === "feed" ? "No new feed memories" : "No following memories"}
+                  {audience === "feed" ? "No new feed memories" : "No friends memories"}
                 </Text>
                 <Text style={[styles.emptyMemoryBody, { color: theme.muted }]}>
                   {audience === "feed"
-                    ? "Followed people move to Following."
-                    : "Follow people from Feed to see them here."}
+                    ? "Public memories from people who are not friends appear here."
+                    : "Accepted friends appear here."}
                 </Text>
               </View>
             )}
@@ -327,7 +334,7 @@ export function MemoriesScreen({
 
         {mode === "browser" ? (
           <Pressable
-            accessibilityLabel="People you follow"
+            accessibilityLabel="Friends"
             onPress={() => setPeopleVisible(true)}
             style={styles.controlButton}
           >
@@ -563,7 +570,7 @@ function PeopleModal({ visible, theme, people, onClose, onUnfollow }: PeopleModa
         <View style={[styles.modalPanel, styles.peoplePanel, { backgroundColor: theme.panel }]}>
           <View style={styles.modalHeader}>
             <View>
-              <Text style={[styles.eyebrow, { color: theme.muted }]}>Following</Text>
+              <Text style={[styles.eyebrow, { color: theme.muted }]}>Friends</Text>
               <Text style={[styles.modalTitle, { color: theme.text }]}>People</Text>
             </View>
             <Pressable onPress={onClose} style={[styles.modalClose, { backgroundColor: theme.panel2 }]}>
@@ -579,19 +586,19 @@ function PeopleModal({ visible, theme, people, onClose, onUnfollow }: PeopleModa
                   </View>
                   <View style={styles.personCopy}>
                     <Text style={[styles.dmName, { color: theme.text }]}>{person.name}</Text>
-                    <Text style={[styles.dmBody, { color: theme.muted }]}>Memories show in Following</Text>
+                    <Text style={[styles.dmBody, { color: theme.muted }]}>Accepted friend</Text>
                   </View>
                   <Pressable
                     onPress={() => onUnfollow(person.id)}
                     style={styles.unfollowButton}
                   >
-                    <Text style={styles.unfollowText}>Unfollow</Text>
+                    <Text style={styles.unfollowText}>Remove</Text>
                   </Pressable>
                 </View>
               ))
             ) : (
               <Text style={[styles.emptyDm, { color: theme.muted }]}>
-                People you follow will appear here.
+                Friends will appear here.
               </Text>
             )}
           </View>
@@ -749,6 +756,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 15,
     backgroundColor: colors.accent.green
+  },
+  requestedButton: {
+    backgroundColor: colors.accent.yellow
   },
   followText: {
     color: colors.black,

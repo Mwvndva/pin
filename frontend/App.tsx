@@ -40,6 +40,7 @@ export default function App() {
               onCreatePin={pingly.addPin}
               onDeletePin={pingly.removePin}
               onPullUp={pingly.markPullingUp}
+              onReactToPin={pingly.sendPinReaction}
               onReportPin={(pinId) => pingly.report("pin", pinId, "unsafe")}
             />
           )}

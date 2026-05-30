@@ -74,6 +74,7 @@ export async function createPin(input: {
   startsAt?: string;
   latitude?: number;
   longitude?: number;
+  audience?: "friends" | "public";
 }): Promise<Pin> {
   return request<Pin>("/api/pins", {
     method: "POST",
@@ -111,6 +112,19 @@ export async function logOut() {
 
 export async function pullUp(pinId: string): Promise<{ ok: boolean; pullingUp: number }> {
   return request<{ ok: boolean; pullingUp: number }>(`/api/pins/${pinId}/pull-up`, { method: "POST" });
+}
+
+export async function reactToPin(
+  pinId: string,
+  emoji: string
+): Promise<{ reactions: string[]; reactionCounts: Record<string, number>; userReaction: string }> {
+  return request<{ reactions: string[]; reactionCounts: Record<string, number>; userReaction: string }>(
+    `/api/pins/${pinId}/reactions`,
+    {
+      method: "POST",
+      body: JSON.stringify({ emoji })
+    }
+  );
 }
 
 export async function uploadMemory(input: {

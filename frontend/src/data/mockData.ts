@@ -13,7 +13,10 @@ export const pins: Pin[] = [
     color: colors.accent.yellow,
     unsafe: false,
     hasMemories: true,
-    reactions: ["🔥", "🎵", "😍"]
+    reactions: ["\u{1F525}", "\u{1F3B5}", "\u{1F60D}"],
+    reactionCounts: { "\u{1F525}": 8, "\u{1F3B5}": 5, "\u{1F60D}": 3 },
+    userReaction: null,
+    audience: "friends"
   },
   {
     id: "kilimani-brunch",
@@ -26,7 +29,10 @@ export const pins: Pin[] = [
     color: colors.accent.pink,
     unsafe: false,
     hasMemories: true,
-    reactions: ["😋", "✨", "🥂"]
+    reactions: ["\u{1F60B}", "\u2728", "\u{1F942}"],
+    reactionCounts: { "\u{1F60B}": 6, "\u2728": 4, "\u{1F942}": 2 },
+    userReaction: null,
+    audience: "public"
   },
   {
     id: "cbd-games",
@@ -39,7 +45,10 @@ export const pins: Pin[] = [
     color: colors.accent.green,
     unsafe: false,
     hasMemories: true,
-    reactions: ["🎮", "🔥", "😄"]
+    reactions: ["\u{1F3AE}", "\u{1F525}", "\u{1F604}"],
+    reactionCounts: { "\u{1F3AE}": 3, "\u{1F525}": 4, "\u{1F604}": 2 },
+    userReaction: null,
+    audience: "public"
   },
   {
     id: "ngong-popup",
@@ -52,7 +61,10 @@ export const pins: Pin[] = [
     color: colors.accent.purple,
     unsafe: true,
     hasMemories: false,
-    reactions: []
+    reactions: [],
+    reactionCounts: { "\u{1F62C}": 1 },
+    userReaction: "\u{1F62C}",
+    audience: "friends"
   }
 ];
 
@@ -63,14 +75,16 @@ export const memories: Memory[] = [
     age: "12m",
     audience: "feed",
     mutual: false,
-    followed: false
+    followed: false,
+    friendStatus: "none"
   },
   {
     id: "nia-following",
     owner: "Nia",
-    age: "2d",
-    audience: "following",
+    age: "6h",
+    audience: "friends",
     mutual: true,
-    followed: true
+    followed: true,
+    friendStatus: "friends"
   }
 ];

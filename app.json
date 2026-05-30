@@ -4,10 +4,10 @@
     "slug": "pin",
     "version": "0.1.0",
     "orientation": "portrait",
-    "icon": "./assets/kompas-logo.png",
+    "icon": "./frontend/assets/kompas-logo.png",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/kompas-logo.png",
+      "image": "./frontend/assets/kompas-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#050505"
     },
@@ -24,7 +24,7 @@
       "package": "com.pin.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/kompas-logo.png",
+        "foregroundImage": "./frontend/assets/kompas-logo.png",
         "backgroundColor": "#050505"
       },
       "permissions": [

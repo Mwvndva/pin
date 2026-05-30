@@ -17,11 +17,14 @@ type PinsScreenProps = {
   pins: Pin[];
   streak: VibeStreak;
   currentUserId?: string;
-  onCreatePin: (input: { title: string; area: string; category?: string; startsAt?: string }) => Promise<Pin>;
+  onCreatePin: (input: { title: string; area: string; category?: string; startsAt?: string; audience?: "friends" | "public" }) => Promise<Pin>;
   onDeletePin: (pinId: string) => Promise<void>;
   onPullUp: (pinId: string) => Promise<{ pullingUp: number } | void>;
+  onReactToPin: (pinId: string, emoji: string) => Promise<{ reactions: string[]; reactionCounts: Record<string, number>; userReaction: string } | void>;
   onReportPin: (pinId: string) => Promise<void>;
 };
+
+const pinReactionOptions = ["\u{1F525}", "\u{1F3B5}", "\u{1F60D}", "\u{1F62C}"];
 
 const memorySlides = [
   { backgroundColor: "#1f1f1f", personColor: "#111" },
@@ -37,6 +40,7 @@ export function PinsScreen({
   onCreatePin,
   onDeletePin,
   onPullUp,
+  onReactToPin,
   onReportPin
 }: PinsScreenProps) {
   const [selectedPin, setSelectedPin] = useState<Pin | null>(null);
@@ -47,11 +51,14 @@ export function PinsScreen({
   const [newPinArea, setNewPinArea] = useState("");
   const [newPinDate, setNewPinDate] = useState("");
   const [newPinTime, setNewPinTime] = useState("");
+  const [newPinAudience, setNewPinAudience] = useState<"friends" | "public">("friends");
   const [newPinError, setNewPinError] = useState<string | null>(null);
   const [memoryIndex, setMemoryIndex] = useState(0);
   const [memoryOverlayInteractive, setMemoryOverlayInteractive] = useState(true);
   const memoryOverlayOpacity = useRef(new Animated.Value(1)).current;
   const memoryOverlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const mapPanOffset = useRef({ x: 0, y: 0 });
 
   const hideMemoryOverlay = useCallback(() => {
     Animated.timing(memoryOverlayOpacity, {
@@ -82,8 +89,31 @@ export function PinsScreen({
   };
 
   const pullUpCount = (pin: Pin) => pin.pullingUp ?? pin.interested;
+  const expiresLabel = (pin: Pin) => {
+    if (!pin.expiresAt) return "Expires in 24h";
+    const hours = Math.max(0, Math.ceil((new Date(pin.expiresAt).getTime() - Date.now()) / 3600000));
+    return hours <= 1 ? "Expires soon" : `Expires in ${hours}h`;
+  };
   const canDeleteSelectedPin = Boolean(selectedPin && selectedPin.creatorId === currentUserId);
   const activeMemorySlide = memorySlides[memoryIndex] ?? memorySlides[0];
+  const pinReactionCounts = selectedPin?.reactionCounts ?? {};
+  const reactToSelectedPin = async (emoji: string) => {
+    if (!selectedPin) return;
+    const result = await onReactToPin(selectedPin.id, emoji);
+    setSelectedPin((pin) =>
+      pin
+        ? {
+            ...pin,
+            reactions: result?.reactions ?? Array.from(new Set([...pin.reactions, emoji])),
+            reactionCounts: result?.reactionCounts ?? {
+              ...pin.reactionCounts,
+              [emoji]: (pin.reactionCounts?.[emoji] ?? 0) + (pin.userReaction === emoji ? 0 : 1)
+            },
+            userReaction: result?.userReaction ?? emoji
+          }
+        : pin
+    );
+  };
   const memorySwipeResponder = useMemo(
     () =>
       PanResponder.create({
@@ -106,6 +136,38 @@ export function PinsScreen({
         }
       }),
     [selectedPin?.hasMemories]
+  );
+  const mapPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          !detailsVisible &&
+          Math.abs(gesture.dx) > 8 &&
+          Math.abs(gesture.dy) > 8,
+        onPanResponderGrant: () => {
+          mapPan.setOffset(mapPanOffset.current);
+          mapPan.setValue({ x: 0, y: 0 });
+        },
+        onPanResponderMove: Animated.event(
+          [null, { dx: mapPan.x, dy: mapPan.y }],
+          { useNativeDriver: false }
+        ),
+        onPanResponderRelease: (_, gesture) => {
+          mapPanOffset.current = {
+            x: mapPanOffset.current.x + gesture.dx,
+            y: mapPanOffset.current.y + gesture.dy
+          };
+          mapPan.flattenOffset();
+        },
+        onPanResponderTerminate: (_, gesture) => {
+          mapPanOffset.current = {
+            x: mapPanOffset.current.x + gesture.dx,
+            y: mapPanOffset.current.y + gesture.dy
+          };
+          mapPan.flattenOffset();
+        }
+      }),
+    [detailsVisible, mapPan]
   );
 
   useEffect(() => {
@@ -178,42 +240,50 @@ export function PinsScreen({
       </View>
 
       <View style={[styles.mapPanel, { backgroundColor: theme.panel }]}>
-        <Text style={[styles.area, styles.areaWestlands, { backgroundColor: theme.panel2, color: theme.text }]}>
-          Westlands
-        </Text>
-        <Text style={[styles.area, styles.areaCbd, { backgroundColor: theme.panel2, color: theme.text }]}>
-          CBD
-        </Text>
+        <Animated.View
+          style={[
+            styles.mapContent,
+            { transform: mapPan.getTranslateTransform() }
+          ]}
+          {...mapPanResponder.panHandlers}
+        >
+          <Text style={[styles.area, styles.areaWestlands, { backgroundColor: theme.panel2, color: theme.text }]}>
+            Westlands
+          </Text>
+          <Text style={[styles.area, styles.areaCbd, { backgroundColor: theme.panel2, color: theme.text }]}>
+            CBD
+          </Text>
 
-        {pins.map((pin, index) => (
-          <Pressable
-            key={pin.id}
-            onPress={() => openPin(pin)}
-            style={[
-              styles.pin,
-              pinPositions[index],
-            ]}
-          >
-            <View
+          {pins.map((pin, index) => (
+            <Pressable
+              key={pin.id}
+              onPress={() => openPin(pin)}
               style={[
-                styles.pinShape,
-                {
-                  backgroundColor: pin.color,
-                  borderColor: selectedPin?.id === pin.id ? colors.white : colors.black
-                }
+                styles.pin,
+                pinPositions[index],
               ]}
             >
-              <Text
+              <View
                 style={[
-                  styles.pinText,
-                  { color: pin.color === colors.accent.purple ? colors.white : colors.black }
+                  styles.pinShape,
+                  {
+                    backgroundColor: pin.color,
+                    borderColor: selectedPin?.id === pin.id ? colors.white : colors.black
+                  }
                 ]}
               >
-                {pullUpCount(pin)}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
+                <Text
+                  style={[
+                    styles.pinText,
+                    { color: pin.color === colors.accent.purple ? colors.white : colors.black }
+                  ]}
+                >
+                  {pullUpCount(pin)}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </Animated.View>
 
         {detailsVisible && (
           <Pressable
@@ -243,6 +313,9 @@ export function PinsScreen({
             <View style={styles.topSignals}>
               <Text style={[styles.category, { backgroundColor: theme.panel2, color: theme.text }]}>
                 {selectedPin.category}
+              </Text>
+              <Text style={[styles.visibilityBadge, { backgroundColor: theme.panel2, color: theme.text }]}>
+                {selectedPin.audience === "public" ? "Public" : "Friends"}
               </Text>
               {selectedPin.unsafe && <Text style={styles.unsafe}>Marked unsafe</Text>}
             </View>
@@ -287,6 +360,9 @@ export function PinsScreen({
                     </Pressable>
                     <View style={styles.topSignals}>
                       <Text style={styles.floatingCategory}>{selectedPin.category}</Text>
+                      <Text style={styles.floatingVisibility}>
+                        {selectedPin.audience === "public" ? "Public" : "Friends"}
+                      </Text>
                       {selectedPin.unsafe && <Text style={styles.unsafe}>Marked unsafe</Text>}
                     </View>
                     <View style={styles.popupFooter}>
@@ -297,12 +373,36 @@ export function PinsScreen({
                         <Text numberOfLines={1} style={[styles.popupMeta, { color: colors.white }]}>
                           {selectedPin.time} • {pullUpCount(selectedPin)} pulling up
                         </Text>
+                        <Text numberOfLines={1} style={[styles.popupMeta, { color: colors.white }]}>
+                          {expiresLabel(selectedPin)}
+                        </Text>
                         <View style={styles.reactions}>
-                          {selectedPin.reactions.map((reaction) => (
-                            <Text key={reaction} style={styles.reactionBubble}>
+                          {selectedPin.reactions.map((reaction, index) => (
+                            <Text key={`${reaction}-${index}`} style={styles.reactionBubble}>
                               {reaction}
                             </Text>
                           ))}
+                        </View>
+                        <View style={styles.pinReactionRow}>
+                          {pinReactionOptions.map((emoji) => {
+                            const active = selectedPin.userReaction === emoji;
+                            return (
+                              <Pressable
+                                key={emoji}
+                                accessibilityLabel={`React to pin with ${emoji}`}
+                                onPress={() => reactToSelectedPin(emoji)}
+                                style={[
+                                  styles.pinReactionChip,
+                                  active && styles.pinReactionChipActive
+                                ]}
+                              >
+                                <Text style={styles.pinReactionEmoji}>{emoji}</Text>
+                                <Text style={styles.pinReactionCount}>
+                                  {pinReactionCounts[emoji] ?? 0}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
                         </View>
                       </View>
                       <View style={styles.popupActions}>
@@ -386,6 +486,37 @@ export function PinsScreen({
                 >
                   {selectedPin.time} • {pullUpCount(selectedPin)} pulling up
                 </Text>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.popupMeta,
+                    { color: selectedPin.hasMemories ? colors.white : theme.text }
+                  ]}
+                >
+                  {expiresLabel(selectedPin)}
+                </Text>
+                <View style={styles.emptyPinReactionRow}>
+                  {pinReactionOptions.map((emoji) => {
+                    const active = selectedPin.userReaction === emoji;
+                    return (
+                      <Pressable
+                        key={emoji}
+                        accessibilityLabel={`React to pin with ${emoji}`}
+                        onPress={() => reactToSelectedPin(emoji)}
+                        style={[
+                          styles.pinReactionChip,
+                          { backgroundColor: theme.panel2 },
+                          active && styles.pinReactionChipActive
+                        ]}
+                      >
+                        <Text style={styles.pinReactionEmoji}>{emoji}</Text>
+                        <Text style={[styles.pinReactionCount, { color: theme.text }]}>
+                          {pinReactionCounts[emoji] ?? 0}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
               <View style={styles.emptyPopupActions}>
                 <Pressable
@@ -483,6 +614,31 @@ export function PinsScreen({
                 style={[styles.input, styles.inputHalf, { color: theme.text, borderColor: theme.line }]}
               />
             </View>
+            <View style={styles.audienceControl}>
+              {(["friends", "public"] as const).map((audience) => {
+                const active = newPinAudience === audience;
+                return (
+                  <Pressable
+                    key={audience}
+                    onPress={() => setNewPinAudience(audience)}
+                    style={[
+                      styles.audienceOption,
+                      {
+                        backgroundColor: active ? colors.accent.yellow : theme.panel2,
+                        borderColor: active ? colors.accent.yellow : theme.line
+                      }
+                    ]}
+                  >
+                    <Text style={[styles.audienceText, { color: active ? colors.black : theme.text }]}>
+                      {audience === "friends" ? "Friends" : "Public"}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text style={[styles.audienceHint, { color: theme.muted }]}>
+              Friends is default. Public can be seen by everyone on Pin.
+            </Text>
             {newPinError && <Text style={styles.formError}>{newPinError}</Text>}
             <Pressable
               onPress={async () => {
@@ -498,12 +654,14 @@ export function PinsScreen({
                     title: newPinTitle || "Untitled pin",
                     area: newPinArea || "Nairobi",
                     category: "Pop-up",
+                    audience: newPinAudience,
                     ...(startsAt ? { startsAt } : {})
                   });
                   setNewPinTitle("");
                   setNewPinArea("");
                   setNewPinDate("");
                   setNewPinTime("");
+                  setNewPinAudience("friends");
                   setCreateVisible(false);
                 } catch (error) {
                   setNewPinError(error instanceof Error ? error.message : "Use a valid optional date and time");
@@ -601,6 +759,9 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     padding: 16
   },
+  mapContent: {
+    ...StyleSheet.absoluteFillObject
+  },
   area: {
     position: "absolute",
     zIndex: 1,
@@ -686,6 +847,13 @@ const styles = StyleSheet.create({
     gap: 6
   },
   category: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  visibilityBadge: {
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -829,6 +997,47 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.9)",
     fontSize: 14
   },
+  pinReactionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 5
+  },
+  emptyPinReactionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 7
+  },
+  pinReactionChip: {
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    backgroundColor: "rgba(255,255,255,0.18)"
+  },
+  pinReactionChipActive: {
+    backgroundColor: colors.accent.yellow
+  },
+  pinReactionEmoji: {
+    fontSize: 13
+  },
+  pinReactionCount: {
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900"
+  },
+  floatingVisibility: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    color: colors.white,
+    fontSize: 10,
+    fontWeight: "900"
+  },
   popupActions: {
     position: "absolute",
     right: 0,
@@ -957,6 +1166,28 @@ const styles = StyleSheet.create({
   },
   inputHalf: {
     flex: 1
+  },
+  audienceControl: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 7
+  },
+  audienceOption: {
+    flex: 1,
+    minHeight: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 999
+  },
+  audienceText: {
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  audienceHint: {
+    marginBottom: 12,
+    fontSize: 11,
+    fontWeight: "700"
   },
   formError: {
     marginBottom: 10,

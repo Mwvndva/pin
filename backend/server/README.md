@@ -43,4 +43,4 @@ Replace the in-memory `db` object with PostgreSQL tables for:
 
 Keep the route behavior stable so the mobile app does not need rewrites.
 
-Use `server/schema.sql` as the first local schema draft.
+Use `backend/server/schema.sql` as the first local schema draft.

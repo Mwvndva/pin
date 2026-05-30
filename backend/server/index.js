@@ -35,6 +35,7 @@ const db = {
       unsafe: false,
       latitude: -1.264,
       longitude: 36.803,
+      audience: "friends",
       hasMemories: true
     },
     {
@@ -50,6 +51,7 @@ const db = {
       unsafe: false,
       latitude: -1.292,
       longitude: 36.787,
+      audience: "public",
       hasMemories: true
     },
     {
@@ -65,6 +67,7 @@ const db = {
       unsafe: false,
       latitude: -1.286,
       longitude: 36.817,
+      audience: "public",
       hasMemories: true
     },
     {
@@ -74,21 +77,27 @@ const db = {
       area: "Ngong Road",
       category: "Pop-up",
       startsAt: hoursFromNow(22),
-      expiresAt: hoursFromNow(48),
+      expiresAt: hoursFromNow(24),
       interested: 9,
       color: "#6017e8",
       unsafe: true,
       latitude: -1.302,
       longitude: 36.75,
+      audience: "friends",
       hasMemories: false
     }
   ],
   memories: [
     { id: "zuri-feed", ownerId: "user-zuri", pinId: "kilimani-brunch", audience: "feed", createdAt: new Date(now.getTime() - 12 * 60 * 1000).toISOString(), mediaUrl: null },
-    { id: "nia-following", ownerId: "user-nia", pinId: "westlands-rooftop", audience: "following", createdAt: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(), mediaUrl: null }
+    { id: "nia-friends", ownerId: "user-nia", pinId: "westlands-rooftop", audience: "friends", createdAt: new Date(now.getTime() - 6 * 60 * 60 * 1000).toISOString(), mediaUrl: null }
   ],
   reactions: [
-    { id: "reaction-1", userId: "user-current", memoryId: "nia-following", emoji: "🔥", createdAt: now.toISOString() }
+    { id: "reaction-1", userId: "user-current", memoryId: "nia-friends", emoji: "🔥", createdAt: now.toISOString() }
+  ],
+  pinReactions: [
+    { id: "pin-reaction-1", userId: "user-nia", pinId: "westlands-rooftop", emoji: "\u{1F525}", createdAt: now.toISOString() },
+    { id: "pin-reaction-2", userId: "user-zuri", pinId: "westlands-rooftop", emoji: "\u{1F3B5}", createdAt: now.toISOString() },
+    { id: "pin-reaction-3", userId: "user-current", pinId: "ngong-popup", emoji: "\u{1F62C}", createdAt: now.toISOString() }
   ],
   pullUps: [],
   reports: [],
@@ -154,28 +163,51 @@ function formatAge(createdAt) {
   return `${Math.floor(hours / 24)}d`;
 }
 
+function pinReactionSummary(pinId) {
+  return db.pinReactions
+    .filter((reaction) => reaction.pinId === pinId)
+    .reduce((summary, reaction) => {
+      summary[reaction.emoji] = (summary[reaction.emoji] || 0) + 1;
+      return summary;
+    }, {});
+}
+
 function serializePin(pin) {
   const reactions = db.reactions
     .filter((reaction) => db.memories.some((memory) => memory.pinId === pin.id && memory.id === reaction.memoryId))
     .map((reaction) => reaction.emoji);
+  const reactionCounts = pinReactionSummary(pin.id);
+  const userReaction =
+    db.pinReactions.find((reaction) => reaction.pinId === pin.id && reaction.userId === currentUser().id)?.emoji ||
+    null;
+  const pinReactionEmojis = Object.keys(reactionCounts);
   const pullingUp = db.pullUps.filter((pullUp) => pullUp.pinId === pin.id).length || pin.pullingUp || pin.interested;
   return {
     ...pin,
     pullingUp,
     time: new Date(pin.startsAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }),
-    reactions: reactions.length ? reactions : ["🔥", "🎵", "😍"]
+    reactions: pinReactionEmojis.length ? pinReactionEmojis : reactions.length ? reactions : ["\u{1F525}", "\u{1F3B5}", "\u{1F60D}"],
+    reactionCounts,
+    userReaction
   };
 }
 
 function serializeMemory(memory) {
   const owner = db.users.find((user) => user.id === memory.ownerId);
   const userId = currentUser().id;
+  const friends = isMutual(userId, memory.ownerId);
   return {
     ...memory,
     owner: owner?.displayName || "Unknown",
     age: formatAge(memory.createdAt),
-    mutual: isMutual(userId, memory.ownerId),
-    followed: db.follows.some((follow) => follow.followerId === userId && follow.followingId === memory.ownerId),
+    audience: memory.audience === "following" ? "friends" : memory.audience,
+    mutual: friends,
+    followed: friends,
+    friendStatus: friends
+      ? "friends"
+      : db.follows.some((follow) => follow.followerId === userId && follow.followingId === memory.ownerId)
+        ? "pending"
+        : "none",
     reacted: db.reactions.some((reaction) => reaction.userId === userId && reaction.memoryId === memory.id)
   };
 }
@@ -193,10 +225,15 @@ function getPrimaryStreak() {
 }
 
 function bootstrap() {
+  const activePinIds = new Set(
+    db.pins.filter((pin) => new Date(pin.expiresAt).getTime() > Date.now()).map((pin) => pin.id)
+  );
   return {
     user: currentUser(),
     pins: db.pins.filter((pin) => new Date(pin.expiresAt).getTime() > Date.now()).map(serializePin),
-    memories: db.memories.map(serializeMemory),
+    memories: db.memories
+      .filter((memory) => activePinIds.has(memory.pinId) && Date.now() - new Date(memory.createdAt).getTime() < 24 * 60 * 60 * 1000)
+      .map(serializeMemory),
     notifications: db.notifications.filter((notification) => notification.userId === currentUser().id),
     dms: db.dms.filter((dm) => dm.fromUserId === currentUser().id || dm.toUserId === currentUser().id),
     streak: getPrimaryStreak()
@@ -298,6 +335,7 @@ async function handle(req, res) {
         unsafe: false,
         latitude: Number(body.latitude || -1.286),
         longitude: Number(body.longitude || 36.817),
+        audience: body.audience === "public" ? "public" : "friends",
         hasMemories: false
       };
       db.pins.push(pin);
@@ -323,6 +361,7 @@ async function handle(req, res) {
       db.pins.splice(pinIndex, 1);
       db.memories = db.memories.filter((memory) => memory.pinId !== pinId);
       db.reactions = db.reactions.filter((reaction) => !deletedMemoryIds.includes(reaction.memoryId));
+      db.pinReactions = db.pinReactions.filter((reaction) => reaction.pinId !== pinId);
       db.pullUps = db.pullUps.filter((pullUp) => pullUp.pinId !== pinId);
       db.reports = db.reports.filter((report) => report.targetId !== pinId);
       send(res, 200, { ok: true });
@@ -341,13 +380,49 @@ async function handle(req, res) {
       return;
     }
 
+    if (req.method === "POST" && path.match(/^\/api\/pins\/[^/]+\/reactions$/)) {
+      const pinId = path.split("/")[3];
+      const body = await readJson(req);
+      const pin = db.pins.find((item) => item.id === pinId);
+      if (!pin) {
+        send(res, 404, { error: "Pin not found." });
+        return;
+      }
+
+      const emoji = String(body.emoji || "\u{1F525}");
+      const existing = db.pinReactions.find(
+        (reaction) => reaction.pinId === pinId && reaction.userId === currentUser().id
+      );
+      if (existing) {
+        existing.emoji = emoji;
+        existing.createdAt = new Date().toISOString();
+      } else {
+        db.pinReactions.push({
+          id: randomUUID(),
+          pinId,
+          userId: currentUser().id,
+          emoji,
+          createdAt: new Date().toISOString()
+        });
+      }
+
+      const reactionCounts = pinReactionSummary(pinId);
+      send(res, 200, {
+        ok: true,
+        reactions: Object.keys(reactionCounts),
+        reactionCounts,
+        userReaction: emoji
+      });
+      return;
+    }
+
     if (req.method === "POST" && path === "/api/memories") {
       const body = await readJson(req);
       const memory = {
         id: randomUUID(),
         ownerId: currentUser().id,
         pinId: String(body.pinId || "westlands-rooftop"),
-        audience: "following",
+        audience: body.audience === "public" ? "feed" : "friends",
         createdAt: new Date().toISOString(),
         mediaUrl: body.mediaUrl || null
       };

@@ -6,11 +6,13 @@ Pin is a social map app for discovering nearby social pins, seeing event memorie
 
 This repository now contains:
 
-- The original HTML/CSS prototype: `index.html`, `styles.css`
+- The original HTML/CSS prototype: `frontend/index.html`, `frontend/styles.css`
+- Frontend app code under `frontend/`
 - A new Expo/React Native mobile app foundation
 - Static MVP screens for Pins, Memories, Settings, create-pin flow, mutual DMs, notifications, and vibe streaks
-- A local Node.js API scaffold under `server/` with seed data and Android-ready endpoints
-- PostgreSQL schema draft: `server/schema.sql`
+- Backend API code under `backend/`
+- A local Node.js API scaffold under `backend/server/` with seed data and Android-ready endpoints
+- PostgreSQL schema draft: `backend/server/schema.sql`
 
 ## No-Paid-Service Constraint
 

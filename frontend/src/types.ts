@@ -26,8 +26,11 @@ export type Pin = {
   unsafe: boolean;
   hasMemories: boolean;
   reactions: string[];
+  reactionCounts?: Record<string, number>;
+  userReaction?: string | null;
   latitude?: number;
   longitude?: number;
+  audience?: "friends" | "public";
 };
 
 export type Memory = {
@@ -36,9 +39,10 @@ export type Memory = {
   pinId?: string;
   owner: string;
   age: string;
-  audience: "feed" | "following";
+  audience: "feed" | "friends" | "following";
   mutual: boolean;
   followed: boolean;
+  friendStatus?: "none" | "pending" | "friends";
   reacted?: boolean;
   mediaUrl?: string | null;
 };
