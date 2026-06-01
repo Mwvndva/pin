@@ -28,7 +28,7 @@ const db = {
       title: "Westlands rooftop",
       area: "Westlands",
       category: "Live music",
-      startsAt: hoursFromNow(3),
+      startsAt: now.toISOString(),
       expiresAt: hoursFromNow(24),
       interested: 48,
       color: "#ffcc00",
@@ -44,7 +44,7 @@ const db = {
       title: "Kilimani brunch",
       area: "Kilimani",
       category: "Food",
-      startsAt: hoursFromNow(6),
+      startsAt: now.toISOString(),
       expiresAt: hoursFromNow(24),
       interested: 22,
       color: "#f45bb8",
@@ -60,7 +60,7 @@ const db = {
       title: "CBD games night",
       area: "CBD",
       category: "Games",
-      startsAt: hoursFromNow(5),
+      startsAt: now.toISOString(),
       expiresAt: hoursFromNow(24),
       interested: 17,
       color: "#a8ff4f",
@@ -69,22 +69,6 @@ const db = {
       longitude: 36.817,
       audience: "public",
       hasMemories: true
-    },
-    {
-      id: "ngong-popup",
-      creatorId: "user-current",
-      title: "Ngong Road pop-up",
-      area: "Ngong Road",
-      category: "Pop-up",
-      startsAt: hoursFromNow(22),
-      expiresAt: hoursFromNow(24),
-      interested: 9,
-      color: "#6017e8",
-      unsafe: true,
-      latitude: -1.302,
-      longitude: 36.75,
-      audience: "friends",
-      hasMemories: false
     }
   ],
   memories: [
@@ -185,7 +169,7 @@ function serializePin(pin) {
   return {
     ...pin,
     pullingUp,
-    time: new Date(pin.startsAt).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }),
+    time: "Live now",
     reactions: pinReactionEmojis.length ? pinReactionEmojis : reactions.length ? reactions : ["\u{1F525}", "\u{1F3B5}", "\u{1F60D}"],
     reactionCounts,
     userReaction
@@ -230,7 +214,7 @@ function bootstrap() {
   );
   return {
     user: currentUser(),
-    pins: db.pins.filter((pin) => new Date(pin.expiresAt).getTime() > Date.now()).map(serializePin),
+    pins: db.pins.filter((pin) => pin.hasMemories && new Date(pin.expiresAt).getTime() > Date.now()).map(serializePin),
     memories: db.memories
       .filter((memory) => activePinIds.has(memory.pinId) && Date.now() - new Date(memory.createdAt).getTime() < 24 * 60 * 60 * 1000)
       .map(serializeMemory),
@@ -317,6 +301,10 @@ async function handle(req, res) {
 
     if (req.method === "POST" && path === "/api/pins") {
       const body = await readJson(req);
+      if (!body.hasMemory) {
+        send(res, 400, { error: "A pin requires a memory." });
+        return;
+      }
       const existing = db.pins.find((pin) => pin.creatorId === currentUser().id && new Date(pin.expiresAt).getTime() > Date.now());
       if (existing) {
         send(res, 409, { error: "Only one active pin is allowed per user." });
@@ -328,17 +316,27 @@ async function handle(req, res) {
         title: String(body.title || "Untitled pin"),
         area: String(body.area || "Nairobi"),
         category: String(body.category || "Pop-up"),
-        startsAt: body.startsAt || new Date().toISOString(),
-        expiresAt: body.expiresAt || hoursFromNow(24),
+        startsAt: new Date().toISOString(),
+        expiresAt: hoursFromNow(24),
         interested: 1,
         color: body.color || "#ffcc00",
         unsafe: false,
         latitude: Number(body.latitude || -1.286),
         longitude: Number(body.longitude || 36.817),
         audience: body.audience === "public" ? "public" : "friends",
-        hasMemories: false
+        hasMemories: Boolean(body.hasMemory)
       };
       db.pins.push(pin);
+      if (body.hasMemory) {
+        db.memories.push({
+          id: randomUUID(),
+          ownerId: currentUser().id,
+          pinId: pin.id,
+          audience: pin.audience === "public" ? "feed" : "friends",
+          createdAt: new Date().toISOString(),
+          mediaUrl: body.mediaUrl || null
+        });
+      }
       send(res, 201, serializePin(pin));
       return;
     }
